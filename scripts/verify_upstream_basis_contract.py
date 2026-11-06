@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-"""Verify Rust wire behavior against the pinned official Basis C# test contract.
-
-The fixture is extracted from BasisServerTests, not re-authored here. The script
-also reads the official AdminRequestMode enum so protocol IDs cannot silently drift.
-"""
+"""Verify Rust wire behavior against the pinned official Basis C# test contract."""
 from __future__ import annotations
 
 import argparse
@@ -33,7 +29,7 @@ def read(root: Path, path: Path) -> str:
 
 def enum_values(source: str, name: str) -> dict[str, int]:
     match = re.search(
-        rf"\\benum\\s+{re.escape(name)}\\s*(?::\\s*\\w+)?\\s*\\{{(.*?)^\\s*\\}}",
+        rf"\benum\s+{re.escape(name)}\s*(?::\s*\w+)?\s*\{{(.*?)^\s*\}}",
         source,
         re.MULTILINE | re.DOTALL,
     )
@@ -45,7 +41,7 @@ def enum_values(source: str, name: str) -> dict[str, int]:
         line = raw_line.split("//", 1)[0].strip().rstrip(",").strip()
         if not line:
             continue
-        item = re.fullmatch(r"([A-Za-z_]\\w*)(?:\\s*=\\s*(\\d+))?", line)
+        item = re.fullmatch(r"([A-Za-z_]\w*)(?:\s*=\s*(\d+))?", line)
         if not item:
             raise ValueError(f"cannot parse {name} enum line: {raw_line!r}")
         key, explicit = item.groups()
@@ -67,10 +63,10 @@ def official_lock_state_bytes(root: Path) -> tuple[dict[str, int], list[int]]:
     start = source.find("SendLockStateToPeer_WritesTheAppendOnlyWireLayout")
     if start < 0:
         raise ValueError("official append-only lock-state test not found")
-    end = source.find("\\n    [Fact]", start)
+    end = source.find("\n    [Fact]", start)
     method = source[start:] if end < 0 else source[start:end]
     array = re.search(
-        r"Assert\\.Equal\\(new byte\\[\\]\\s*\\{(.*?)\\},\\s*payload\\);",
+        r"Assert\.Equal\(new byte\[\]\s*\{(.*?)\},\s*payload\);",
         method,
         re.DOTALL,
     )
@@ -79,7 +75,7 @@ def official_lock_state_bytes(root: Path) -> tuple[dict[str, int], list[int]]:
 
     tokens = [
         token.strip()
-        for token in re.sub(r"//[^\\n]*", "", array.group(1)).replace("\\n", " ").split(",")
+        for token in re.sub(r"//[^\n]*", "", array.group(1)).replace("\n", " ").split(",")
         if token.strip()
     ]
     values: list[int] = []
@@ -113,9 +109,9 @@ def main() -> int:
             "review the upstream change before updating the pin"
         )
 
-    modes, values = official_lock_state_bytes(root)
+    _, values = official_lock_state_bytes(root)
     fixture = FIXTURE
-    expected = " ".join(f"{value:02x}" for value in values) + "\\n"
+    expected = " ".join(f"{value:02x}" for value in values) + "\n"
     fixture.parent.mkdir(parents=True, exist_ok=True)
     if args.write:
         fixture.write_text(expected, encoding="ascii")
@@ -123,7 +119,7 @@ def main() -> int:
     else:
         if not fixture.exists():
             raise ValueError(f"missing fixture: {fixture}; run with --write")
-        checked_in = " ".join(fixture.read_text(encoding="ascii").split()) + "\\n"
+        checked_in = " ".join(fixture.read_text(encoding="ascii").split()) + "\n"
         if checked_in != expected:
             raise ValueError(
                 "official Basis test contract changed; inspect upstream diff and update "
