@@ -23,7 +23,7 @@ try {
     if (-not $health.listening -or $health.capacity -lt 1) {
         throw 'health endpoint did not report a listening server'
     }
-    if ($health.version -ne '56' -or -not $health.currentTime -or -not $health.startTime -or -not $health.process -or -not $health.memory) {
+    if ($health.version -ne '57' -or -not $health.currentTime -or -not $health.startTime -or -not $health.process -or -not $health.memory) {
         throw 'health endpoint is missing required fields'
     }
     if ($health.process.rssBytes -lt 1) {
