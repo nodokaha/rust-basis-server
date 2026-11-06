@@ -7,7 +7,7 @@ Rust 実装 `rust-basis-server` は、既存 C# クライアントをそのま�
 
 - LiteNetLib 互換 UDP トランスポート（ConnectRequest/Accept、ReliableOrdered、
   Sequenced、Unreliable、Merged/CompactMerged、Ack、Ping/Pong、送信フラグメント）
-- プロトコル 56（X25519 接続キー、ログイン transcript 署名、ChaCha20-Poly1305 の client→server 暗号化）
+- プロトコル 57（X25519 接続キー、ログイン transcript 署名、ChaCha20-Poly1305 の client→server 暗号化）
 - Company/Product 検証、パスワード認証、DID Ed25519 チャレンジ応答
 - サーバーメタデータ、RemotePlayer スポーンバッチ
 - チャット中継、ボイス中継
@@ -15,7 +15,7 @@ Rust 実装 `rust-basis-server` は、既存 C# クライアントをそのま�
 - 距離に応じた VeryLow / Low / Medium へのキーフレーム再パック
 - 後入りクライアントへの最新キーフレーム入りスポーン
 - 大きな join fill の raw Deflate 圧縮（`ServerReadyBatchMessage`）
-- 初回起動時の C# 既定 `config.xml` 生成（`<exe>/config/config.xml`、schema v15）
+- 初回起動時の C# 既定 `config.xml` 生成（`<exe>/config/config.xml`、schema v19）
 - 旧 schema の `config.xml` に不足設定を追加し、C# と同じログを出すアップグレード
 - ヘッドレス初回起動時の `NO ADMIN CONFIGURED` 警告ブロック
 - 対話型の初回設定ウィザード（サーバー設定・管理者 UUID、スクリプト入力で E2E テスト済み）
@@ -43,6 +43,46 @@ Rust 実装 `rust-basis-server` は、既存 C# クライアントをそのま�
 - Player cleanup と空サーバー時の NetworkID DB リセットログ
 - モジュール単位の Cargo クレート分割（wire / crypto / protocol / avatar / config / logging / health / control / p2p / telemetry / permissions / setup / transport / server）
 - 不正パスワードの接続前拒否
+
+## 公式 Basis C# 実装による検証
+
+通常の GitHub Actions の互換性 E2E は、Rust 側のプロトコル／設定／HTTP／UDP の契約を検証します。
+これに加えて、公式 Unity ワークスペースに含まれる C# クライアントハーネスと C# サーバーを
+オラクルとして実行する専用ワークフローを用意しています。
+
+- Workflow: **Official Basis C# compatibility**
+- 起動: GitHub Actions の `workflow_dispatch` から手動実行
+- Runner: Windows x64 self-hosted runner（ラベル `basis-unity`）
+- 実行内容:
+  1. `BasisCompatHarness.csproj` を .NET 10 でビルド
+  2. `scripts/run-compat.ps1` で C# クライアントから Rust サーバーへ接続し、認証、チャット／ボイス／アバター、後入り、切断、不正パスワード、距離品質低下、サーバー情報照会を検証
+  3. `scripts/check-log-compat.ps1` で C# クライアントが発生させるログ契約を検証
+  4. `scripts/diff-log-compat.ps1` で公式 C# サーバーと Rust サーバーの共通ログ列を比較
+  5. テストログを Actions artifact に保存
+
+### Self-hosted runner の準備
+
+runner の `GITHUB_WORKSPACE` 直下に、公式 Unity ワークスペースから次のファイルを配置してください。
+Unity プロジェクトや C# バイナリはこのリポジトリへコピー／コミットしません。
+
+```text
+$GITHUB_WORKSPACE/
+  .basis-test/
+    harness/
+      BasisCompatHarness.csproj
+      ... C# harness sources and Unity references ...
+    server/
+      BasisNetworkConsole.exe
+  rust-basis-server/        # workflow が checkout する
+```
+
+runner に Rust stable と .NET 10 SDK を導入し、GitHub Actions runner の追加ラベルとして
+`basis-unity` を設定します。workflow はこのラベルを持つ Windows x64 runner でのみ実行されます。
+C# harness のビルド成果物は `harness/bin/Release/net10.0/BasisCompatHarness.dll` に生成される必要があります。
+
+公式 Unity ワークスペースを持たない通常の hosted runner ではこのテストを実行できません。
+その場合も既存の `CI` workflow は Linux / Windows / macOS で Rust の単体・互換性テストを継続します。
+この専用 workflow が未実行／未設定である状態を、公式 C# 互換性テストの成功とは扱いません。
 
 ## 検証結果
 
@@ -75,7 +115,7 @@ powershell -ExecutionPolicy Bypass -File rust-basis-server\scripts\diff-log-comp
 
 `.github/workflows/ci.yml` は Linux / Windows / macOS で書式・Clippy・単体テスト・Doc テスト・
 リリースビルドに加え、`bin/basis-server/tests/compat_e2e.rs` の互換性 E2E を実行します。
-この E2E は実 `basis-server-rs` を起動し、`config.xml` schema v15 の初回生成と旧 schema の
+この E2E は実 `basis-server-rs` を起動し、`config.xml` schema v19 の初回生成と旧 schema の
 アップグレード、`permissions.xml` の管理者シード、C# 形式のログと `Logs/yyyy-MM-dd.log`、
 health / REST のステータス・ヘッダー・フィールド、未接続サーバー情報 UDP クエリ、
 サーバー満員（kind 2）と `Invalid client data.` の reject パケットを検証します。
@@ -83,7 +123,7 @@ C# ハーネス（`scripts/run-compat.ps1`）は Unity ワークスペースの 
 `BasisNetworkServer` を参照するためホストランナーではビルドできず、Windows 上の
 ローカル実行（またはそのワークスペースを持つ self-hosted ランナー）のままです。
 
-`cargo test` は 114 件成功（うち CI 実行の互換性 E2E 12 件）。実 Unity クライアントでサーバー配信 world の `Scene Load From Server Complete` を確認。Unity MCP 経由で Unity プロジェクトの正式ブートシーンを接続し、`test` world のロード、`Players=2` / `RemotePlayers=1` / `PlayerReady=True`、リモート位置の追従（Unity `(0.81, 5.49, -17.11)`、サーバー `(-0.101, 5.0800004, -18.227001)`）、エディタ発チャットの 56 コンソール到達、コンソール停止時の `Peer removed: 1` / `Player 1 removed and cleaned up.` と Unity の `RemotePlayers=0`、コンソール発チャットの Unity 受信 `[CHAT-IN] 2:headless-chat-0-21035`、ボイス受信キュー `BasisNetworkHandleVoice.Message.Count=1` を確認。`scripts/run-compat.ps1`（health version 56）、`scripts/check-log-compat.ps1`、`scripts/run-headless-56.ps1` は成功。特に `repack::tests::matches_the_csharp_repacker_oracle` は、
+`cargo test` は 114 件成功（うち CI 実行の互換性 E2E 12 件）。実 Unity クライアントでサーバー配信 world の `Scene Load From Server Complete` を確認。Unity MCP 経由で Unity プロジェクトの正式ブートシーンを接続し、`test` world のロード、`Players=2` / `RemotePlayers=1` / `PlayerReady=True`、リモート位置の追従（Unity `(0.81, 5.49, -17.11)`、サーバー `(-0.101, 5.0800004, -18.227001)`）、エディタ発チャットの 56 コンソール到達、コンソール停止時の `Peer removed: 1` / `Player 1 removed and cleaned up.` と Unity の `RemotePlayers=0`、コンソール発チャットの Unity 受信 `[CHAT-IN] 2:headless-chat-0-21035`、ボイス受信キュー `BasisNetworkHandleVoice.Message.Count=1` を確認。`scripts/run-compat.ps1`（health version 57）、`scripts/check-log-compat.ps1`、`scripts/run-headless-56.ps1` は成功。特に `repack::tests::matches_the_csharp_repacker_oracle` は、
 C# の `AvatarQualityRepacker` が同じ High 入力から生成した Medium/Low/VeryLow の
 バイト列と Rust の出力が完全一致することを確認しています。
 
