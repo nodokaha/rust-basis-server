@@ -87,6 +87,47 @@ jobs:
       - name: Run compatibility suite
         run: cargo test -p basis-server --test compat_e2e --locked -- --test-threads=1
 
+  upstream-conformance:
+    name: Official Basis conformance
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout Rust server
+        uses: actions/checkout@v4
+
+      - name: Checkout pinned official Basis source
+        uses: actions/checkout@v4
+        with:
+          repository: BasisVR/Basis
+          ref: d8b718d4fb6a16e6f2339d4431ffd1212d97c69d
+          path: upstream/Basis
+
+      - name: Verify fixture against official source and tests
+        run: python3 scripts/verify_upstream_basis_contract.py --upstream-root upstream/Basis
+
+      - name: Install .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Run the official Basis lock-state test
+        working-directory: upstream/Basis
+        run: >
+          dotnet test "Basis Server/BasisServerTests/BasisServerTests.csproj"
+          --configuration Release
+          --filter "FullyQualifiedName~SendLockStateToPeer_WritesTheAppendOnlyWireLayout"
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+
+      - name: Compare Rust output with official C# test fixture
+        run: >
+          cargo test -p basis-transport --locked
+          global_lock_state_matches_the_official_basis_csharp_test_fixture
+
   build:
     name: Release build
     runs-on: ubuntu-latest
