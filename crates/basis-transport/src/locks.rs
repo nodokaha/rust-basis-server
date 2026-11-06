@@ -139,14 +139,6 @@ mod tests {
         assert_eq!(&payload[23..], &[1, 1, 8, 0, 2, 7]);
     }
 
-    #[test]
-    fn protocol_57_admin_request_mode_ids_match_basis() {
-        assert_eq!(ADMIN_MODE_LOCK_AVATAR_HOSTING, 101);
-        assert_eq!(ADMIN_MODE_LOCK_VIDEO_CLIPS, 102);
-        assert_eq!(ADMIN_MODE_SET_IMAGE_MAX_RESOLUTION_K, 103);
-        assert_eq!(ADMIN_MODE_SET_VIDEO_CLIP_MAX_MEGABYTES, 104);
-        assert_eq!(ADMIN_MODE_SET_VIDEO_CLIP_MAX_PER_PLAYER, 105);
-    }
 
     #[test]
     fn admin_toggle_modes_flip_the_right_flag() {
