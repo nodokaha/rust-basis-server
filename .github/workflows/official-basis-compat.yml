@@ -1,0 +1,79 @@
+name: Official Basis C# compatibility
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: official-basis-compat-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  official-csharp:
+    name: Official C# client and server oracle (protocol 57)
+    runs-on: [self-hosted, Windows, X64, basis-unity]
+    timeout-minutes: 45
+    steps:
+      - name: Checkout Rust server
+        uses: actions/checkout@v4
+        with:
+          path: rust-basis-server
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Verify official Unity workspace
+        shell: pwsh
+        run: |
+          $harnessDir = Join-Path $env:GITHUB_WORKSPACE '.basis-test/harness'
+          $harnessDll = Join-Path $harnessDir 'bin/Release/net10.0/BasisCompatHarness.dll'
+          $csharpServer = Join-Path $env:GITHUB_WORKSPACE '.basis-test/server/BasisNetworkConsole.exe'
+          if (-not (Test-Path $harnessDir)) {
+            throw "Missing $harnessDir. Provision the official Basis Unity workspace and C# compatibility harness on this runner."
+          }
+          if (-not (Test-Path $csharpServer)) {
+            throw "Missing $csharpServer. Build the official BasisNetworkConsole server in the Unity workspace."
+          }
+          $projects = @(Get-ChildItem -Path $harnessDir -Filter '*.csproj' -Recurse)
+          if ($projects.Count -ne 1) {
+            throw "Expected exactly one C# harness project under $harnessDir; found $($projects.Count)."
+          }
+          dotnet build $projects[0].FullName --configuration Release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (-not (Test-Path $harnessDll)) {
+            throw "Harness build did not produce $harnessDll."
+          }
+
+      - name: Run official C# client compatibility suite
+        shell: pwsh
+        working-directory: ${{ github.workspace }}
+        run: |
+          & .\rust-basis-server\scripts\run-compat.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Compare C# and Rust server logs
+        shell: pwsh
+        working-directory: ${{ github.workspace }}
+        run: |
+          & .\rust-basis-server\scripts\check-log-compat.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & .\rust-basis-server\scripts\diff-log-compat.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Upload compatibility logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: official-basis-compat-logs
+          path: |
+            .basis-test/*.log
+            .basis-test/*.out.log
+            .basis-test/*.err.log
+          if-no-files-found: warn
