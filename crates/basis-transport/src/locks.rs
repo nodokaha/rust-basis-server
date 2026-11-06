@@ -1,5 +1,11 @@
 //! Server-wide feature locks mirrored from BasisGlobalLockManager.
 
+pub const ADMIN_MODE_LOCK_AVATAR_HOSTING: u8 = 101;
+pub const ADMIN_MODE_LOCK_VIDEO_CLIPS: u8 = 102;
+pub const ADMIN_MODE_SET_IMAGE_MAX_RESOLUTION_K: u8 = 103;
+pub const ADMIN_MODE_SET_VIDEO_CLIP_MAX_MEGABYTES: u8 = 104;
+pub const ADMIN_MODE_SET_VIDEO_CLIP_MAX_PER_PLAYER: u8 = 105;
+
 #[derive(Debug, Clone, Copy, Default)]
 pub struct GlobalLocks {
     pub avatars: bool,
@@ -90,8 +96,8 @@ impl GlobalLocks {
             92 => &mut self.gifs,
             96 => &mut self.content_removal,
             97 => &mut self.external_links,
-            101 => &mut self.avatar_hosting,
-            102 => &mut self.video_clips,
+            ADMIN_MODE_LOCK_AVATAR_HOSTING => &mut self.avatar_hosting,
+            ADMIN_MODE_LOCK_VIDEO_CLIPS => &mut self.video_clips,
             _ => return None,
         };
         *slot = !*slot;
@@ -131,6 +137,15 @@ mod tests {
         };
         let payload = locks.payload();
         assert_eq!(&payload[23..], &[1, 1, 8, 0, 2, 7]);
+    }
+
+    #[test]
+    fn protocol_57_admin_request_mode_ids_match_basis() {
+        assert_eq!(ADMIN_MODE_LOCK_AVATAR_HOSTING, 101);
+        assert_eq!(ADMIN_MODE_LOCK_VIDEO_CLIPS, 102);
+        assert_eq!(ADMIN_MODE_SET_IMAGE_MAX_RESOLUTION_K, 103);
+        assert_eq!(ADMIN_MODE_SET_VIDEO_CLIP_MAX_MEGABYTES, 104);
+        assert_eq!(ADMIN_MODE_SET_VIDEO_CLIP_MAX_PER_PLAYER, 105);
     }
 
     #[test]
