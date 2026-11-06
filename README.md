@@ -66,6 +66,10 @@ o logs will be saved` / `Logs are saved to <absolute path>`
 
 The protocol-57 `GlobalGetLockState` extension is implemented, including avatar-hosting/video-clip lock state and the shared image/video limits. The `basis.avatarhost` and `basis.screenshare` plugin relays are not implemented yet; clients can connect, but those two features are not available through this Rust server. Full feature parity with the current C# server is therefore not claimed.
 
+## Official Basis conformance
+
+The pinned upstream C# lock-state test is executed in CI, and its expected wire bytes are extracted and compared byte-for-byte with the Rust implementation. See [the conformance workflow and update procedure](docs/UPSTREAM-CONFORMANCE.md).
+
 ## Feature coverage
 
 - Reduction scheduling: distance-based quality tiers, interval advertisement and send throttle,

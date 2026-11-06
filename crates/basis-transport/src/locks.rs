@@ -134,6 +134,41 @@ mod tests {
     }
 
     #[test]
+    fn global_lock_state_matches_the_official_basis_csharp_test_fixture() {
+        let locks = GlobalLocks {
+            avatars: true,
+            worlds: true,
+            third_person: true,
+            camera_metadata_mask: 0x5a,
+            user_restriction_mode: 2,
+            playspace_mover: true,
+            cilbox: true,
+            end_effector_ik_disabled: true,
+            text_chat: true,
+            media_player: true,
+            prop_grabbing: true,
+            safe_display_names: true,
+            gifs: true,
+            external_links: true,
+            avatar_hosting: true,
+            image_max_resolution_k: 8,
+            video_clip_max_megabytes: 512,
+            video_clip_max_per_player: 7,
+            ..Default::default()
+        };
+        let expected: Vec<u8> = include_str!("../tests/fixtures/upstream_global_lock_state.hex")
+            .split_whitespace()
+            .map(|byte| u8::from_str_radix(byte, 16).expect("valid official hex byte"))
+            .collect();
+
+        assert_eq!(
+            locks.payload(),
+            expected,
+            "Rust GlobalGetLockState bytes must match BasisServerTests::SendLockStateToPeer_WritesTheAppendOnlyWireLayout"
+        );
+    }
+
+    #[test]
     fn admin_toggle_modes_flip_the_right_flag() {
         let mut locks = GlobalLocks::default();
         assert_eq!(locks.toggle(67), Some(true));
