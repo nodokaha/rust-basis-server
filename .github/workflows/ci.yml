@@ -87,10 +87,59 @@ jobs:
       - name: Run compatibility suite
         run: cargo test -p basis-server --test compat_e2e --locked -- --test-threads=1
 
-  upstream-conformance:
-    name: Official Basis conformance
+  upstream-official-tests:
+    name: Official Basis C# tests
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
+    env:
+      DOTNET_PROCESSOR_COUNT: 4
+    steps:
+      - name: Checkout Rust server
+        uses: actions/checkout@v4
+
+      - name: Checkout pinned official Basis source
+        uses: actions/checkout@v4
+        with:
+          repository: BasisVR/Basis
+          ref: d8b718d4fb6a16e6f2339d4431ffd1212d97c69d
+          path: upstream/Basis
+
+      # These two failures were observed in the upstream suite under the hosted runner:
+      # a processor-count mismatch and a collection mutation race. Limit .NET's reported
+      # processor count and disable xUnit collection parallelism without editing upstream code.
+      - name: Configure deterministic xUnit execution
+        working-directory: upstream/Basis
+        run: |
+          cat > "Basis Server/BasisServerTests/xunit.runner.json" <<'EOF'
+          {
+            "parallelizeTestCollections": false,
+            "maxParallelThreads": 1
+          }
+          EOF
+          cat > Directory.Build.targets <<'EOF'
+          <Project>
+            <ItemGroup Condition="'$(MSBuildProjectName)' == 'BasisServerTests'">
+              <None Update="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+            </ItemGroup>
+          </Project>
+          EOF
+
+      # The published Basis server runtime image is not an SDK/test-runner image and does not
+      # contain the source test project. Use Microsoft's SDK image for the official source suite.
+      - name: Run complete official Basis server test suite in .NET SDK container
+        run: |
+          docker run --rm --cpus=4 \
+            -e DOTNET_PROCESSOR_COUNT="$DOTNET_PROCESSOR_COUNT" \
+            -v "$GITHUB_WORKSPACE/upstream/Basis:/src" \
+            -w /src \
+            mcr.microsoft.com/dotnet/sdk:10.0 \
+            dotnet test "Basis Server/BasisServerTests/BasisServerTests.csproj" \
+              --configuration Release
+
+  upstream-rust-fixture:
+    name: Rust output vs official C# fixture
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout Rust server
         uses: actions/checkout@v4
@@ -104,17 +153,6 @@ jobs:
 
       - name: Verify fixture against official source and tests
         run: python3 scripts/verify_upstream_basis_contract.py --upstream-root upstream/Basis
-
-      - name: Install .NET 10
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 10.0.x
-
-      - name: Run the complete official Basis server test suite
-        working-directory: upstream/Basis
-        run: >
-          dotnet test "Basis Server/BasisServerTests/BasisServerTests.csproj"
-          --configuration Release
 
       - name: Install stable Rust
         uses: dtolnay/rust-toolchain@stable
