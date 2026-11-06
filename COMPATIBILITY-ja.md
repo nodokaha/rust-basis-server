@@ -44,46 +44,6 @@ Rust 実装 `rust-basis-server` は、既存 C# クライアントをそのま�
 - モジュール単位の Cargo クレート分割（wire / crypto / protocol / avatar / config / logging / health / control / p2p / telemetry / permissions / setup / transport / server）
 - 不正パスワードの接続前拒否
 
-## 公式 Basis C# 実装による検証
-
-通常の GitHub Actions の互換性 E2E は、Rust 側のプロトコル／設定／HTTP／UDP の契約を検証します。
-これに加えて、公式 Unity ワークスペースに含まれる C# クライアントハーネスと C# サーバーを
-オラクルとして実行する専用ワークフローを用意しています。
-
-- Workflow: **Official Basis C# compatibility**
-- 起動: GitHub Actions の `workflow_dispatch` から手動実行
-- Runner: Windows x64 self-hosted runner（ラベル `basis-unity`）
-- 実行内容:
-  1. `BasisCompatHarness.csproj` を .NET 10 でビルド
-  2. `scripts/run-compat.ps1` で C# クライアントから Rust サーバーへ接続し、認証、チャット／ボイス／アバター、後入り、切断、不正パスワード、距離品質低下、サーバー情報照会を検証
-  3. `scripts/check-log-compat.ps1` で C# クライアントが発生させるログ契約を検証
-  4. `scripts/diff-log-compat.ps1` で公式 C# サーバーと Rust サーバーの共通ログ列を比較
-  5. テストログを Actions artifact に保存
-
-### Self-hosted runner の準備
-
-runner の `GITHUB_WORKSPACE` 直下に、公式 Unity ワークスペースから次のファイルを配置してください。
-Unity プロジェクトや C# バイナリはこのリポジトリへコピー／コミットしません。
-
-```text
-$GITHUB_WORKSPACE/
-  .basis-test/
-    harness/
-      BasisCompatHarness.csproj
-      ... C# harness sources and Unity references ...
-    server/
-      BasisNetworkConsole.exe
-  rust-basis-server/        # workflow が checkout する
-```
-
-runner に Rust stable と .NET 10 SDK を導入し、GitHub Actions runner の追加ラベルとして
-`basis-unity` を設定します。workflow はこのラベルを持つ Windows x64 runner でのみ実行されます。
-C# harness のビルド成果物は `harness/bin/Release/net10.0/BasisCompatHarness.dll` に生成される必要があります。
-
-公式 Unity ワークスペースを持たない通常の hosted runner ではこのテストを実行できません。
-その場合も既存の `CI` workflow は Linux / Windows / macOS で Rust の単体・互換性テストを継続します。
-この専用 workflow が未実行／未設定である状態を、公式 C# 互換性テストの成功とは扱いません。
-
 ## 検証結果
 
 ```powershell
